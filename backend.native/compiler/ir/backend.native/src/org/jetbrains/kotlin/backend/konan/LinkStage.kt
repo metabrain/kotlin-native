@@ -41,7 +41,6 @@ internal class LinkStage(val context: Context, val phaser: PhaseManager) {
         else -> TODO("${context.config.produce} should not reach native linker stage")
     }
     private val nomain = config.get(KonanConfigKeys.NOMAIN) ?: false
-    private val emitted = context.bitcodeFileName
     private val libraries = context.llvm.librariesToLink
     private fun MutableList<String>.addNonEmpty(elements: List<String>) {
         addAll(elements.filter { !it.isEmpty() })
@@ -208,9 +207,6 @@ internal class LinkStage(val context: Context, val phaser: PhaseManager) {
     }
 
     fun linkStage() {
-        val bitcodeFiles = listOf(emitted) +
-                libraries.map { it.bitcodePaths }.flatten()
-
         val includedBinaries =
                 libraries.map { it.includedPaths }.flatten()
 
@@ -219,17 +215,25 @@ internal class LinkStage(val context: Context, val phaser: PhaseManager) {
 
         val objectFiles: MutableList<String> = mutableListOf()
 
-        phaser.phase(KonanPhase.OBJECT_FILES) {
-            objectFiles.add(
-                    when (platform.configurables) {
-                        is WasmConfigurables
-                        -> bitcodeToWasm(bitcodeFiles)
-                        is ZephyrConfigurables
-                        -> llvmLinkAndLlc(bitcodeFiles)
-                        else
-                        -> llvmLto(bitcodeFiles)
-                    }
-            )
+        val phaser = PhaseManager(context)
+        if (context.shouldUseNewPipeline()) {
+            objectFiles += context.mergedObject.absolutePath
+        } else {
+            phaser.phase(KonanPhase.OBJECT_FILES) {
+                val emitted = context.bitcodeFileName
+                val bitcodeFiles = listOf(emitted) +
+                        libraries.map { it.bitcodePaths }.flatten()
+                objectFiles.add(
+                        when (platform.configurables) {
+                            is WasmConfigurables
+                            -> bitcodeToWasm(bitcodeFiles)
+                            is ZephyrConfigurables
+                            -> llvmLinkAndLlc(bitcodeFiles)
+                            else
+                            -> llvmLto(bitcodeFiles)
+                        }
+                )
+            }
         }
         phaser.phase(KonanPhase.LINKER) {
             link(objectFiles, includedBinaries, libraryProvidedLinkerFlags)

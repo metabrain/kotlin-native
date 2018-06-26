@@ -35,6 +35,7 @@ internal fun produceOutput(context: Context, phaser: PhaseManager) {
     val produce = config.get(KonanConfigKeys.PRODUCE)
 
     when (produce) {
+
         CompilerOutputKind.STATIC,
         CompilerOutputKind.DYNAMIC,
         CompilerOutputKind.FRAMEWORK,

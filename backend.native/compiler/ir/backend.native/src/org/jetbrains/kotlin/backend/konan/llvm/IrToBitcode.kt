@@ -137,7 +137,7 @@ internal fun emitLLVM(context: Context, phaser: PhaseManager) {
     }
 }
 
-internal fun verifyModule(llvmModule: LLVMModuleRef, current: String = "") {
+internal fun verifyModule(llvmModule: LLVMModuleRef, context: Context, current: String = "") {
     memScoped {
         val errorRef = allocPointerTo<ByteVar>()
         // TODO: use LLVMDisposeMessage() on errorRef, once possible in interop.
@@ -145,7 +145,7 @@ internal fun verifyModule(llvmModule: LLVMModuleRef, current: String = "") {
                 llvmModule, LLVMVerifierFailureAction.LLVMPrintMessageAction, errorRef.ptr) == 1) {
             if (current.isNotEmpty())
                 println("Error in $current")
-            LLVMDumpModule(llvmModule)
+            LLVMWriteBitcodeToFile(llvmModule, context.config.tempFiles.create("error_dump", ".bc").path)
             throw Error("Invalid module")
         }
     }
@@ -688,7 +688,7 @@ internal class CodeGeneratorVisitor(val context: Context, val lifetimes: Map<IrE
         }
 
         if (context.shouldVerifyBitCode())
-            verifyModule(context.llvmModule!!,
+            verifyModule(context.llvmModule!!, context,
                 "${declaration.descriptor.containingDeclaration}::${ir2string(declaration)}")
     }
 

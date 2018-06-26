@@ -21,6 +21,7 @@ include ':Interop:JsRuntime'
 include ':Interop:StubGenerator'
 include ':Interop:Runtime'
 include ':llvmDebugInfoC'
+include ':libllvmext'
 include ':libclangext'
 include ':klib'
 include ':backend.native'
@@ -45,3 +46,5 @@ if (hasProperty("kotlinProjectPath")) {
         }
     }
 }
+include 'libllvmext'
+

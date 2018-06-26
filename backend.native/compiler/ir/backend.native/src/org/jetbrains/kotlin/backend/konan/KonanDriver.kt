@@ -19,6 +19,7 @@ package org.jetbrains.kotlin.backend.konan
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.konan.ir.KonanSymbols
 import org.jetbrains.kotlin.backend.konan.ir.ModuleIndex
+import org.jetbrains.kotlin.backend.konan.llvm.codegen.lto
 import org.jetbrains.kotlin.backend.konan.llvm.emitLLVM
 import org.jetbrains.kotlin.backend.konan.serialization.KonanSerializationUtil
 import org.jetbrains.kotlin.backend.konan.serialization.markBackingFields
@@ -104,14 +105,18 @@ fun runTopLevelPhases(konanConfig: KonanConfig, environment: KotlinCoreEnvironme
         }
         phaser.phase(KonanPhase.BITCODE) {
             emitLLVM(context, phaser)
-            produceOutput(context, phaser)
+            if (context.shouldUseNewPipeline()) {
+                lto(context, phaser)
+            } else {
+                produceOutput(context, phaser)
+            }
         }
         // We always verify bitcode to prevent hard to debug bugs.
-        context.verifyBitCode()
-
-        if (context.shouldPrintBitCode()) {
-            context.printBitCode()
-        }
+//        context.verifyBitCode()
+//
+//        if (context.shouldPrintBitCode()) {
+//            context.printBitCode()
+//        }
     }
 
     phaser.phase(KonanPhase.LINK_STAGE) {

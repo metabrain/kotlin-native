@@ -50,8 +50,10 @@ import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
 import org.jetbrains.kotlin.ir.visitors.IrElementVisitorVoid
 import org.jetbrains.kotlin.ir.visitors.acceptChildrenVoid
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
+import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
+import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.metadata.KonanLinkData
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
@@ -465,7 +467,7 @@ internal class Context(config: KonanConfig) : KonanBackendContext(config) {
 
     fun verifyBitCode() {
         if (llvmModule == null) return
-        verifyModule(llvmModule!!)
+        verifyModule(llvmModule!!, this)
     }
 
     fun printBitCode() {
@@ -509,11 +511,20 @@ internal class Context(config: KonanConfig) : KonanBackendContext(config) {
 
     fun shouldOptimize() = config.configuration.getBoolean(KonanConfigKeys.OPTIMIZATION)
 
+    fun shouldUseNewPipeline(): Boolean {
+        val kind = config.configuration.get(KonanConfigKeys.PRODUCE)
+        val goodKind = kind == CompilerOutputKind.DYNAMIC
+                || kind == CompilerOutputKind.STATIC
+                || kind == CompilerOutputKind.PROGRAM
+        val x = config.configuration.getBoolean(KonanConfigKeys.NEW_PIPELINE)
+        return (config.target != KonanTarget.WASM32 && goodKind)
+    }
+
     fun shouldGenerateTestRunner() =
             config.configuration.getBoolean(KonanConfigKeys.GENERATE_TEST_RUNNER)
 
     override fun log(message: () -> String) {
-        if (phase?.verbose ?: false) {
+        if (phase?.verbose == true) {
             println(message())
         }
     }
@@ -527,6 +538,9 @@ internal class Context(config: KonanConfig) : KonanBackendContext(config) {
 
     internal val stdlibModule
         get() = this.builtIns.any.module
+
+    // Initialized in case of default compilation mode.
+    lateinit var mergedObject: File
 }
 
 private fun MemberScope.getContributedClassifier(name: String) =

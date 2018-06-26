@@ -107,6 +107,10 @@ class KonanConfigKeys {
                 = CompilerConfigurationKey.create("verbose backend phases")
         val FRIEND_MODULES: CompilerConfigurationKey<List<String>>
                 = CompilerConfigurationKey.create<List<String>>("friend module paths")
+
+        // TODO: remove
+        val NEW_PIPELINE: CompilerConfigurationKey<Boolean>
+                = CompilerConfigurationKey.create("use new llvm pipeline")
     }
 }
 

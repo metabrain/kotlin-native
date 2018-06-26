@@ -63,6 +63,7 @@ private fun List<String>?.isTrue(): Boolean {
 }
 
 private fun runCmd(command: Array<String>, verbose: Boolean = false) {
+    if (verbose) println(command.joinToString(" "))
     Command(*command).getOutputLines(true).let { lines ->
         if (verbose) lines.forEach(::println)
     }
@@ -326,7 +327,7 @@ private fun processCLib(args: Array<String>): Array<String>? {
                 outOFile.absolutePath, "-shared", "-o", outLib.absolutePath,
                 *linkerOpts)
 
-        runCmd(linkerCmd, verbose)
+        runCmd(linkerCmd, true)
     } else if (flavor == KotlinPlatform.NATIVE) {
         val outBcName = libName + ".bc"
         val outLib = File(nativeLibsDir, outBcName)
