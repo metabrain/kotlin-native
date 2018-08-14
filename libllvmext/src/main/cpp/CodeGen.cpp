@@ -29,7 +29,7 @@ bool KotlinNativeLlvmBackend::compile(std::unique_ptr<Module> module, raw_pwrite
   preparationPasses.add(createInternalizePass());
   preparationPasses.add(createEliminateAvailableExternallyPass());
   preparationPasses.add(createGlobalDCEPass());
-//  preparationPasses.run(*module);
+  preparationPasses.run(*module);
 
   legacy::PassManager modulePasses;
   modulePasses.add(
@@ -137,8 +137,8 @@ void KotlinNativeLlvmBackend::createPasses(legacy::PassManager &modulePasses,
   passManagerBuilder.SizeLevel = sizeLevel;
   passManagerBuilder.SLPVectorize = optLevel > 1;
   passManagerBuilder.LoopVectorize = optLevel > 1;
-  passManagerBuilder.PrepareForLTO = optLevel > 1;
-  passManagerBuilder.PrepareForThinLTO = optLevel > 1;
+  passManagerBuilder.PrepareForLTO = config.shouldPerformLto;
+  passManagerBuilder.PrepareForThinLTO = config.shouldPerformLto;
 
   modulePasses.add(new TargetLibraryInfoWrapperPass(*tlii));
 
@@ -150,5 +150,7 @@ void KotlinNativeLlvmBackend::createPasses(legacy::PassManager &modulePasses,
   }
   passManagerBuilder.populateFunctionPassManager(functionPasses);
   passManagerBuilder.populateModulePassManager(modulePasses);
-  passManagerBuilder.populateLTOPassManager(modulePasses);
+  if (config.shouldPerformLto) {
+    passManagerBuilder.populateLTOPassManager(modulePasses);
+  }
 }

@@ -128,7 +128,7 @@ internal fun emitLLVM(context: Context, phaser: PhaseManager) {
         DFGSerializer.serialize(context, moduleDFG!!)
     }
 
-    phaser.phase(KonanPhase.CODEGEN) {
+    phaser.phase(KonanPhase.BITCODE_GENERATION) {
         irModule.acceptVoid(codegenVisitor)
     }
 

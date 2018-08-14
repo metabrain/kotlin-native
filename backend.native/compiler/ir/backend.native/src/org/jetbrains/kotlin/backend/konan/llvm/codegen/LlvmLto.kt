@@ -9,7 +9,7 @@ import org.jetbrains.kotlin.backend.konan.library.KonanLibraryReader
 import org.jetbrains.kotlin.backend.konan.llvm.parseBitcodeFile
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 
-internal fun lto(context: Context, phaser: PhaseManager) {
+internal fun lto(context: Context, phaser: PhaseManager, nativeLibraries: List<String>) {
     val libraries = context.llvm.librariesToLink
     val programModule = context.llvmModule!!
     val runtime = context.llvm.runtime
@@ -19,8 +19,6 @@ internal fun lto(context: Context, phaser: PhaseManager) {
     val stdlibModule = parseBitcodeFile(stdlibPath)
     val otherModules = libraries.filterNot(::stdlibPredicate).flatMap { it.bitcodePaths }
 
-    val nativeLibraries =
-            context.config.nativeLibraries + context.config.defaultNativeLibraries
     phaser.phase(KonanPhase.BITCODE_LINKER) {
         for (library in nativeLibraries + otherModules) {
             val libraryModule = parseBitcodeFile(library)
@@ -31,10 +29,10 @@ internal fun lto(context: Context, phaser: PhaseManager) {
         }
     }
 
-    // TODO: 
+    // TODO: ugly
     fun Boolean.toInt() = if (this) 1 else 0
 
-    phaser.phase(KonanPhase.NEXTGEN) {
+    phaser.phase(KonanPhase.LLVM_CODEGEN) {
         assert(context.shouldUseNewPipeline()) // just sanity check for now.
         val target = LLVMGetTarget(runtime.llvmModule)!!.toKString()
         val llvmRelocMode = if (context.config.produce == CompilerOutputKind.PROGRAM)
@@ -45,7 +43,7 @@ internal fun lto(context: Context, phaser: PhaseManager) {
             val (outputKind, filename) = Pair(OutputKind.OUTPUT_KIND_OBJECT_FILE, context.mergedObject.absolutePath)
             configuration.apply {
                 optLevel = if (context.shouldOptimize()) 3 else 1
-                sizeLevel = 0 // TODO: make target dependent
+                sizeLevel = 0 // TODO: make target dependent. On wasm it should be >0.
                 this.outputKind = outputKind
                 shouldProfile = context.shouldProfilePhases().toInt()
                 fileName = filename.cstr.ptr

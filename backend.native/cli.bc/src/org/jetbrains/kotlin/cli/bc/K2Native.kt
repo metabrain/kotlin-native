@@ -192,7 +192,7 @@ class K2Native : CLICompiler<K2NativeCompilerArguments>() {
                 if (arguments.friendModules != null)
                     put(FRIEND_MODULES, arguments.friendModules!!.split(File.pathSeparator).filterNot(String::isEmpty))
 
-                put(NEW_PIPELINE, arguments.newPipeline)
+                put(OLD_PIPELINE, arguments.oldPipeline)
             }
         }
     }

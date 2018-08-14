@@ -109,8 +109,8 @@ class KonanConfigKeys {
                 = CompilerConfigurationKey.create<List<String>>("friend module paths")
 
         // TODO: remove
-        val NEW_PIPELINE: CompilerConfigurationKey<Boolean>
-                = CompilerConfigurationKey.create("use new llvm pipeline")
+        val OLD_PIPELINE: CompilerConfigurationKey<Boolean>
+                = CompilerConfigurationKey.create("use old llvm pipeline")
     }
 }
 

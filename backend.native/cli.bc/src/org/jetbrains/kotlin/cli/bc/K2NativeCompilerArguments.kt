@@ -150,8 +150,8 @@ class K2NativeCompilerArguments : CommonCompilerArguments() {
     )
     var friendModules: String? = null
 
-    @Argument(value = "--new-pipeline", description = "Use new LLVM pipeline")
-    var newPipeline: Boolean = false
+    @Argument(value = "--old-pipeline", description = "Use old LLVM pipeline")
+    var oldPipeline: Boolean = false
 
     override fun configureLanguageFeatures(collector: MessageCollector) = super.configureLanguageFeatures(collector).also {
         it[LanguageFeature.InlineClasses] = LanguageFeature.State.ENABLED // TODO: remove after updating to 1.3.
