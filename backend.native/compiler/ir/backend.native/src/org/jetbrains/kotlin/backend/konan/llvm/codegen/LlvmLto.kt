@@ -8,6 +8,7 @@ import org.jetbrains.kotlin.backend.konan.PhaseManager
 import org.jetbrains.kotlin.backend.konan.library.KonanLibraryReader
 import org.jetbrains.kotlin.backend.konan.llvm.parseBitcodeFile
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
+import org.jetbrains.kotlin.konan.target.HostManager
 
 internal fun lto(context: Context, phaser: PhaseManager, nativeLibraries: List<String>) {
     val libraries = context.llvm.librariesToLink
@@ -33,17 +34,24 @@ internal fun lto(context: Context, phaser: PhaseManager, nativeLibraries: List<S
     fun Boolean.toInt() = if (this) 1 else 0
 
     phaser.phase(KonanPhase.LLVM_CODEGEN) {
-        assert(context.shouldUseNewPipeline()) // just sanity check for now.
+        assert(context.shouldUseNewPipeline()) // TODO: just sanity check for now.
         val target = LLVMGetTarget(runtime.llvmModule)!!.toKString()
         val llvmRelocMode = if (context.config.produce == CompilerOutputKind.PROGRAM)
             LLVMRelocMode.LLVMRelocStatic else LLVMRelocMode.LLVMRelocPIC
+        val compilingForHost = HostManager.host == context.config.target
+        val optLevel = when {
+            context.shouldOptimize() -> 3
+            context.shouldContainDebugInfo() -> 0
+            else -> 1
+        }
+        val sizeLevel = 0 // TODO: make target dependent. On wasm it should be >0.
         memScoped {
             val configuration = alloc<CompilationConfiguration>()
             context.mergedObject = context.config.tempFiles.create("merged", ".o")
             val (outputKind, filename) = Pair(OutputKind.OUTPUT_KIND_OBJECT_FILE, context.mergedObject.absolutePath)
             configuration.apply {
-                optLevel = if (context.shouldOptimize()) 3 else 1
-                sizeLevel = 0 // TODO: make target dependent. On wasm it should be >0.
+                this.optLevel = optLevel
+                this.sizeLevel = sizeLevel
                 this.outputKind = outputKind
                 shouldProfile = context.shouldProfilePhases().toInt()
                 fileName = filename.cstr.ptr
@@ -51,6 +59,7 @@ internal fun lto(context: Context, phaser: PhaseManager, nativeLibraries: List<S
                 relocMode = llvmRelocMode
                 shouldPerformLto = context.shouldOptimize().toInt()
                 shouldPreserveDebugInfo = context.shouldContainDebugInfo().toInt()
+                this.compilingForHost = compilingForHost.toInt()
             }
 
             if (LLVMLtoCodegen(

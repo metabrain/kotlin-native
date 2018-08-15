@@ -83,14 +83,14 @@ bool KotlinNativeLlvmBackend::createTargetMachine() {
     logging::error() << error;
     return true;
   }
-  CodeModel::Model codeModel = CodeModel::Default; // TODO: add support for other code models
+  // CodeModel::Model codeModel = CodeModel::Default; // TODO: add support for other code models
   llvm::TargetOptions options;
   targetMachine.reset(target->createTargetMachine(config.targetTriple,
                                                   getCPU(),
                                                   getTargetFeatures(),
                                                   options,
                                                   getRelocModel(),
-                                                  codeModel,
+                                                  None,
                                                   getCodegenOptLevel()));
 
   return false;

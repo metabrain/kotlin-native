@@ -149,7 +149,7 @@ void initLLVM(PassRegistry *registry) {
   initializePreISelIntrinsicLoweringLegacyPassPass(*registry);
   initializeGlobalMergePass(*registry);
   initializeInterleavedAccessPass(*registry);
-  initializeCountingFunctionInserterPass(*registry);
+//  initializeCountingFunctionInserterPass(*registry);
   initializeUnreachableBlockElimLegacyPassPass(*registry);
   initializeExpandReductionsPass(*registry);
 
@@ -160,7 +160,7 @@ void initLLVM(PassRegistry *registry) {
   initializeScavengerTestPass(*registry);
 }
 
-void DiagnosticHandler(const DiagnosticInfo &DI, void *Context) {
+void DiagHandler(const DiagnosticInfo &DI, void *Context) {
   bool *HasError = static_cast<bool *>(Context);
   if (DI.getSeverity() == DS_Error)
     *HasError = true;
@@ -175,9 +175,33 @@ void DiagnosticHandler(const DiagnosticInfo &DI, void *Context) {
   logging::error() << "\n";
 }
 
+// Copied for LTOCodeGenerator. Should change to something more sophisticated.
+std::string determineTargetCPU(const CompilationConfiguration &configuration) {
+  std::string cpu;
+  Triple triple(configuration.targetTriple);
+  if (configuration.compilingForHost) {
+    cpu = llvm::sys::getHostCPUName();
+  }
+  if (cpu.empty() && triple.isOSDarwin()) {
+    if (triple.getArch() == llvm::Triple::x86_64)
+      cpu = "core2";
+    else if (triple.getArch() == llvm::Triple::x86)
+      cpu = "yonah";
+    else if (triple.getArch() == llvm::Triple::aarch64)
+      cpu = "cyclone";
+  }
+  return cpu;
+}
+
+std::string determineTargetFeatures(const CompilationConfiguration &configuration) {
+  Triple triple(configuration.targetTriple);
+  SubtargetFeatures features;
+  features.getDefaultSubtargetFeatures(triple);
+  return features.getString();
+}
+
 extern "C" {
 // TODO: Pick better name.
-// TODO: Pass libraries as array.
 int LLVMLtoCodegen(LLVMContextRef contextRef,
                    LLVMModuleRef programModuleRef,
                    LLVMModuleRef runtimeModuleRef,
@@ -188,8 +212,8 @@ int LLVMLtoCodegen(LLVMContextRef contextRef,
   TimePassesIsEnabled = static_cast<bool>(compilationConfiguration.shouldProfile);
   std::error_code EC;
   sys::fs::OpenFlags OpenFlags = sys::fs::F_None;
-  auto p = new tool_output_file(compilationConfiguration.fileName, EC, OpenFlags);
-  std::unique_ptr<tool_output_file> output(p);
+  auto p = new ToolOutputFile(compilationConfiguration.fileName, EC, OpenFlags);
+  std::unique_ptr<ToolOutputFile> output(p);
   if (EC) {
     logging::error() << EC.message();
     return 1;
@@ -197,8 +221,9 @@ int LLVMLtoCodegen(LLVMContextRef contextRef,
 
   std::unique_ptr<LLVMContext> context(unwrap(contextRef));
 
-  bool HasError = false;
-  context->setDiagnosticHandler(DiagnosticHandler, &HasError);
+// TODO: re-enable diagnostic handler
+//  bool HasError = false;
+//  context->setDiagnosticHandler(DiagHandler, &HasError);
 
   initLLVM(PassRegistry::getPassRegistry());
 
@@ -208,13 +233,20 @@ int LLVMLtoCodegen(LLVMContextRef contextRef,
     return 1;
   }
 
+  std::string cpu = determineTargetCPU(compilationConfiguration);
+
+  std::string targetFeatures = determineTargetFeatures(compilationConfiguration);
+
+  // LLVM heavily relates on proper function attributes placement. Let's make it happy.
+  setFunctionAttributes(cpu, targetFeatures, *module);
+
   KotlinNativeLlvmBackend backend(compilationConfiguration);
   backend.compile(std::move(module), output->os());
 
-  if (*static_cast<bool *>(context->getDiagnosticContext())) {
-    logging::error() << "LLVM Pass Manager failed.\n";
-    return 1;
-  }
+//  if (*static_cast<bool *>(context->getDiagnosticContext())) {
+//    logging::error() << "LLVM Pass Manager failed.\n";
+//    return 1;
+//  }
   output->keep();
   // Print profiling report.
   reportAndResetTimings();

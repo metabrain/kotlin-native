@@ -39,6 +39,9 @@ typedef struct {
   LLVMRelocMode relocMode;
   int shouldPerformLto;
   int shouldPreserveDebugInfo;
+  // TODO: for now, set function attributes only if we're compiling for host (like llc and opt are doing now).
+  // Later it should become more sophisticated and support all cross-compilation modes.
+  int compilingForHost;
 } CompilationConfiguration;
 
 int LLVMLtoCodegen(LLVMContextRef contextRef,
