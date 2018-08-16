@@ -54,13 +54,16 @@ bool KotlinNativeLlvmBackend::compile(std::unique_ptr<Module> module, raw_pwrite
       break;
   }
 
-  functionPasses.doInitialization();
-  for (Function &F : *module)
-    if (!F.isDeclaration())
-      functionPasses.run(F);
-  functionPasses.doFinalization();
 
-  modulePasses.run(*module);
+    functionPasses.doInitialization();
+    for (Function &F : *module)
+      if (!F.isDeclaration())
+        functionPasses.run(F);
+    functionPasses.doFinalization();
+
+  if (config.shouldPerformLto) {
+    modulePasses.run(*module);
+  }
 
   codeGenPasses.run(*module);
 
@@ -83,7 +86,6 @@ bool KotlinNativeLlvmBackend::createTargetMachine() {
     logging::error() << error;
     return true;
   }
-  // CodeModel::Model codeModel = CodeModel::Default; // TODO: add support for other code models
   llvm::TargetOptions options;
   targetMachine.reset(target->createTargetMachine(config.targetTriple,
                                                   getCPU(),
@@ -98,8 +100,11 @@ bool KotlinNativeLlvmBackend::createTargetMachine() {
 
 TargetMachine::CodeGenFileType KotlinNativeLlvmBackend::getCodeGenFileType() {
   switch (config.outputKind) {
-    case OUTPUT_KIND_OBJECT_FILE:return TargetMachine::CodeGenFileType::CGFT_ObjectFile;
-    default:logging::error() << "Unsupported codegen file type!\n";
+    case OUTPUT_KIND_OBJECT_FILE:
+      return TargetMachine::CodeGenFileType::CGFT_ObjectFile;
+
+    default:
+      logging::error() << "Unsupported codegen file type!\n";
       return TargetMachine::CodeGenFileType::CGFT_Null;
   }
 }
@@ -129,6 +134,7 @@ void KotlinNativeLlvmBackend::createPasses(legacy::PassManager &modulePasses,
 
   PassManagerBuilder passManagerBuilder;
   if (optLevel <= 1) {
+    // A lot of runtime functions are marked with `always_inline` so we need to run inliner.
     passManagerBuilder.Inliner = createAlwaysInlinerLegacyPass();
   } else {
     passManagerBuilder.Inliner = createFunctionInliningPass(optLevel, sizeLevel, false);

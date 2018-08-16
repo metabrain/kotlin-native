@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.backend.konan.KonanPhase
 import org.jetbrains.kotlin.backend.konan.PhaseManager
 import org.jetbrains.kotlin.backend.konan.library.KonanLibraryReader
 import org.jetbrains.kotlin.backend.konan.llvm.parseBitcodeFile
+import org.jetbrains.kotlin.backend.konan.reportCompilationError
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.target.KonanTarget
@@ -20,7 +21,7 @@ internal fun linkBitcode(mainModule: LLVMModuleRef, toLink: List<LLVMModuleRef?>
     }
 }
 
-internal fun lto(context: Context, phaser: PhaseManager, nativeLibraries: List<String>) {
+internal fun compile(context: Context, phaser: PhaseManager, nativeLibraries: List<String>) {
     val libraries = context.llvm.librariesToLink
     val programModule = context.llvmModule!!
     val runtime = context.llvm.runtime
@@ -37,41 +38,40 @@ internal fun lto(context: Context, phaser: PhaseManager, nativeLibraries: List<S
     phaser.phase(KonanPhase.LLVM_CODEGEN) {
 
         val target = LLVMGetTarget(runtime.llvmModule)!!.toKString()
-        val compilingForHost = HostManager.host == context.config.target
 
-        val llvmRelocMode = when (context.config.produce) {
-            CompilerOutputKind.PROGRAM -> LLVMRelocMode.LLVMRelocStatic
-            else -> LLVMRelocMode.LLVMRelocPIC
-        }
-
-        val optLevel = when {
-            context.shouldOptimize() -> 3
-            context.shouldContainDebugInfo() -> 0
-            else -> 1
-        }
-
-        val sizeLevel = when (context.config.target) {
-            KonanTarget.WASM32, is KonanTarget.ZEPHYR -> 1
-            else -> 0
-        }
-
-        context.mergedObject = context.config.tempFiles.create("merged", ".o")
-        val (outputKind, filename) = Pair(OutputKind.OUTPUT_KIND_OBJECT_FILE, context.mergedObject.absolutePath)
+        context.mergedObject = context.config.tempFiles.create(context.config.tempFiles.nativeBinaryFileName, ".o")
 
         memScoped {
-            val configuration = alloc<CompilationConfiguration>()
-            configuration.apply {
-                this.optLevel = optLevel
-                this.sizeLevel = sizeLevel
-                this.outputKind = outputKind
-                shouldProfile = context.shouldProfilePhases().toByte().toInt()
-                fileName = filename.cstr.ptr
+            val configuration = alloc<CompilationConfiguration>().apply {
+
+                fileName = context.mergedObject.absolutePath.cstr.ptr
                 targetTriple = target.cstr.ptr
-                relocMode = llvmRelocMode
+
+                optLevel = when {
+                    context.shouldOptimize() -> 3
+                    context.shouldContainDebugInfo() -> 0
+                    else -> 1
+                }
+
+                // We should care about output size on embedded targets.
+                sizeLevel = when (context.config.target) {
+                    KonanTarget.WASM32, is KonanTarget.ZEPHYR -> 2
+                    else -> if (context.shouldOptimize()) 0 else 1
+                }
+
+                outputKind = OutputKind.OUTPUT_KIND_OBJECT_FILE
+
+                shouldProfile = context.shouldProfilePhases().toByte().toInt()
+
+                relocMode = when (context.config.produce) {
+                    CompilerOutputKind.PROGRAM -> LLVMRelocMode.LLVMRelocStatic
+                    else -> LLVMRelocMode.LLVMRelocPIC
+                }
                 shouldPerformLto = context.shouldOptimize().toByte().toInt()
                 shouldPreserveDebugInfo = context.shouldContainDebugInfo().toByte().toInt()
-                this.compilingForHost = compilingForHost.toByte().toInt()
+                compilingForHost = (HostManager.host == context.config.target).toByte().toInt()
             }
+
             if (LLVMLtoCodegen(
                             LLVMGetModuleContext(context.llvmModule),
                             programModule,
@@ -79,7 +79,7 @@ internal fun lto(context: Context, phaser: PhaseManager, nativeLibraries: List<S
                             stdlibModule,
                             configuration.readValue()
                     ) != 0) {
-                context.log { "Codegen failed" }
+                context.reportCompilationError("Codegen failed")
             }
         }
     }

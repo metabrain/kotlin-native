@@ -247,6 +247,7 @@ int LLVMLtoCodegen(LLVMContextRef contextRef,
 //    logging::error() << "LLVM Pass Manager failed.\n";
 //    return 1;
 //  }
+  // Preserve compiler's output.
   output->keep();
   // Print profiling report.
   reportAndResetTimings();
