@@ -53,6 +53,7 @@ import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.konan.file.File
 import org.jetbrains.kotlin.builtins.konan.KonanBuiltIns
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
+import org.jetbrains.kotlin.konan.target.HostManager
 import org.jetbrains.kotlin.konan.target.KonanTarget
 import org.jetbrains.kotlin.metadata.KonanLinkData
 import org.jetbrains.kotlin.name.FqName
@@ -386,6 +387,9 @@ internal class Context(config: KonanConfig) : KonanBackendContext(config) {
     lateinit var bitcodeFileName: String
     lateinit var library: KonanLibraryWriter
 
+    // Initialized in case of default compilation mode.
+    lateinit var mergedObject: File
+
     var phase: KonanPhase? = null
     var depth: Int = 0
 
@@ -512,12 +516,11 @@ internal class Context(config: KonanConfig) : KonanBackendContext(config) {
     fun shouldOptimize() = config.configuration.getBoolean(KonanConfigKeys.OPTIMIZATION)
 
     fun shouldUseNewPipeline(): Boolean {
-        val kind = config.configuration.get(KonanConfigKeys.PRODUCE)
-        val goodKind = kind == CompilerOutputKind.DYNAMIC
-                || kind == CompilerOutputKind.STATIC
-                || kind == CompilerOutputKind.PROGRAM
-        val oldPipelineFlag = config.configuration.getBoolean(KonanConfigKeys.OLD_PIPELINE)
-        return config.target != KonanTarget.WASM32 && goodKind && !oldPipelineFlag
+        if (config.configuration.getBoolean(KonanConfigKeys.OLD_PIPELINE)) {
+            return false
+        }
+        val canCompileWasm = HostManager.hostIsMac
+        return (config.target != KonanTarget.WASM32 || canCompileWasm)
     }
 
     fun shouldGenerateTestRunner() =
@@ -538,9 +541,6 @@ internal class Context(config: KonanConfig) : KonanBackendContext(config) {
 
     internal val stdlibModule
         get() = this.builtIns.any.module
-
-    // Initialized in case of default compilation mode.
-    lateinit var mergedObject: File
 }
 
 private fun MemberScope.getContributedClassifier(name: String) =

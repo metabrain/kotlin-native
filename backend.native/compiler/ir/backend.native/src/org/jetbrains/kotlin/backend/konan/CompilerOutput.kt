@@ -15,9 +15,9 @@
  */
 package org.jetbrains.kotlin.backend.konan
 
-import llvm.LLVMLinkModules2
 import llvm.LLVMWriteBitcodeToFile
 import org.jetbrains.kotlin.backend.konan.library.impl.buildLibrary
+import org.jetbrains.kotlin.backend.konan.llvm.codegen.linkBitcode
 import org.jetbrains.kotlin.backend.konan.llvm.codegen.lto
 import org.jetbrains.kotlin.backend.konan.llvm.parseBitcodeFile
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
@@ -62,13 +62,7 @@ internal fun produceOutput(context: Context, phaser: PhaseManager) {
                 lto(context, phaser, nativeLibraries)
             } else {
                 phaser.phase(KonanPhase.BITCODE_LINKER) {
-                    for (library in nativeLibraries) {
-                        val libraryModule = parseBitcodeFile(library)
-                        val failed = LLVMLinkModules2(llvmModule, libraryModule)
-                        if (failed != 0) {
-                            throw Error("failed to link $library") // TODO: retrieve error message from LLVM.
-                        }
-                    }
+                    linkBitcode(llvmModule, (nativeLibraries).map { parseBitcodeFile(it) })
                 }
                 LLVMWriteBitcodeToFile(llvmModule, output)
             }

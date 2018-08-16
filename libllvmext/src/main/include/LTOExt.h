@@ -32,11 +32,12 @@ typedef enum {
 typedef struct {
   int optLevel;
   int sizeLevel;
-  int shouldProfile;
   const char *fileName;
   OutputKind outputKind;
   const char *targetTriple;
   LLVMRelocMode relocMode;
+
+  int shouldProfile;
   int shouldPerformLto;
   int shouldPreserveDebugInfo;
   // TODO: for now, set function attributes only if we're compiling for host (like llc and opt are doing now).
