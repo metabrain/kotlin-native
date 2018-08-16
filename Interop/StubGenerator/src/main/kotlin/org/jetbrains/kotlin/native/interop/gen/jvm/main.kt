@@ -327,7 +327,7 @@ private fun processCLib(args: Array<String>): Array<String>? {
                 outOFile.absolutePath, "-shared", "-o", outLib.absolutePath,
                 *linkerOpts)
 
-        runCmd(linkerCmd, true)
+        runCmd(linkerCmd, verbose)
     } else if (flavor == KotlinPlatform.NATIVE) {
         val outBcName = libName + ".bc"
         val outLib = File(nativeLibsDir, outBcName)
